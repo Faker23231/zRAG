@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <h1>SSE案例02</h1>
+
+    请输入您要问的问题：<input type="text" id="query" placeholder="请输入问题"/>
+    <br>
+    请输入您的会话id：<input type="text" id="sessionid" placeholder="请输入会话id"/>
+    <br>
+    <button id="btn">发请求给后端</button>
+    <div id="content">
+
+
+    </div>
+
+    <script>
+        const btn = document.getElementById('btn')
+        const query = document.getElementById('query').value
+        const session_id = document.getElementById('sessionid').value
+        // console.log(query)
+
+        btn.onclick = async function (e) {
+            const res = await fetch('http://localhost:8000/sse02',{
+                method: 'POST',
+                headers:{
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query,
+                    "session_id":session_id
+                })
+            })
+            const data = await res.json()
+            console.log(data)
+
+
+            const es = new EventSource('http://localhost:8000/handlersse02?session_id='+session_id)
+
+            es.onmessage = function (e) {
+                console.log(e.data)
+                // document.getElementById('content').innerHTML += e.data + '<br>'
+
+                if(e.data !== "None") {
+                    const divObj = document.getElementById('content')
+                    divObj.innerHTML = divObj.innerHTML + e.data + '<br/>'
+                }else{
+                    es.close() //关闭连接
+                }
+            }
+
+        }
+
+    </script>
+</body>
+</html>

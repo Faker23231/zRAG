@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="theme-color" content="#f6f4ef"/>
+    <title>zRAG · 从 PDF 到带引用的答案的技术路线</title>
+    <meta name="description" content="zRAG 技术路线：MinerU 版面解析、标题感知切分、LLM 知识主体识别、BGE-M3 稠密稀疏双向量、Milvus 混合检索、RRF 融合、DashScope 重排与逐 token 流式作答，每条结论都带切片引用。"/>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
+    <link rel="stylesheet" href="/assets/app.css"/>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div class="ambient" aria-hidden="true">
+    <span class="ambient__blob ambient__blob--blue"></span>
+    <span class="ambient__blob ambient__blob--gold"></span>
+    <span class="ambient__blob ambient__blob--rose"></span>
+</div>
+
+<header class="nav" id="nav">
+    <a class="brand" href="/" data-action="home" aria-label="zRAG 首页">
+        <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+                <rect x="3.4" y="4.6" width="17.2" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                <rect x="6" y="10.4" width="14.6" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1" opacity=".62"/>
+                <rect x="8.6" y="16.2" width="12" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1" opacity=".34"/>
+                <circle cx="4.6" cy="18.4" r="1.5" fill="currentColor"/>
+            </svg>
+        </span>
+        <span class="brand__word">zRAG</span>
+    </a>
+
+    <nav class="nav__links" aria-label="主导航">
+        <a href="#pipeline" data-scroll="pipeline">技术路线</a>
+        <a href="#worlds" data-scroll="worlds">示例资料库</a>
+        <a href="#archive" data-scroll="archive">图鉴索引</a>
+        <a href="#create" data-scroll="create">导入管线</a>
+        <a href="#library" data-scroll="library">我的项目</a>
+    </nav>
+
+    <div class="nav__actions">
+        <span class="engine" id="engine" title="服务状态">
+            <i class="engine__dot" id="engineDot"></i>
+            <span class="engine__label" id="engineLabel">连接中</span>
+        </span>
+        <button class="btn btn--small btn--dark" data-action="open-workspace">
+            进入工作台
+        </button>
+    </div>
+</header>
+
+<main>
+    <!-- ================= 首页 ================= -->
+    <section class="view view--home" id="viewHome">
+        <section class="hero">
+            <p class="eyebrow reveal" style="--d:60ms">zRAG · 检索增强生成</p>
+            <h1 class="hero__title">
+                <span class="line"><span>一条链路</span></span>
+                <span class="line"><span class="hero__gradient">从PDF到答案</span></span>
+            </h1>
+            <p class="hero__sub reveal" style="--d:420ms">
+                MinerU 解析版式，LLM 认领知识主体，BGE-M3 生成稠密与稀疏双向量，<br class="only-wide"/>
+                Milvus 混合检索、RRF 融合、DashScope 重排，最后逐 token 流式作答并标注切片出处。
+            </p>
+            <div class="hero__actions reveal" style="--d:520ms">
+                <button class="btn btn--primary" data-action="open-workspace">
+                    打开对话工作台
+                </button>
+                <button class="btn btn--link" data-scroll="pipeline">
+                    看完整技术路线
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h9M8.4 3.6 12.8 8l-4.4 4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
+            <div class="hero__stage reveal" style="--d:640ms" id="heroStage">
+                <div class="hero-collage" id="heroArt" aria-hidden="true">
+                    <figure class="hero-collage__art hero-collage__art--a">
+                        <img src="/assets/wukong/161-2.jpg" alt="" loading="eager"/>
+                        <figcaption><span>示例 · 游戏</span><strong>黑神话：悟空</strong></figcaption>
+                    </figure>
+                    <figure class="hero-collage__art hero-collage__art--b">
+                        <img src="/assets/covers/coffee.jpg" alt="" loading="lazy"/>
+                        <figcaption><span>示例 · 商品</span><strong>咖啡商品资料</strong></figcaption>
+                    </figure>
+                    <figure class="hero-collage__art hero-collage__art--c">
+                        <img src="/assets/covers/eldenring.jpg" alt="" loading="lazy"/>
+                        <figcaption><span>示例 · 游戏</span><strong>艾尔登法环</strong></figcaption>
+                    </figure>
+                    <span class="hero-collage__seal" aria-hidden="true">知<br/>识</span>
+                </div>
+
+                <article class="preview" aria-hidden="true">
+                    <div class="preview__top">
+                        <span class="preview__avatar">z</span>
+                        <div>
+                            <p class="preview__name">zRAG · 检索链路</p>
+                            <p class="preview__world">示例 · 咖啡商品资料</p>
+                        </div>
+                        <span class="preview__live"><i></i>重排中</span>
+                    </div>
+                    <p class="preview__q">耶加雪菲和曼特宁，手冲参数怎么选？</p>
+                    <div class="preview__a">
+                        <span class="preview__line" style="--w:94%"></span>
+                        <span class="preview__line" style="--w:88%"></span>
+                        <span class="preview__line" style="--w:72%"></span>
+                    </div>
+                    <div class="preview__foot">
+                        <span class="chip chip--tiny">混合召回 10 条切片</span>
+                        <span class="chip chip--tiny">重排后引用 4 段</span>
+                    </div>
+                </article>
+
+            </div>
+
+            <div class="hero__note reveal" style="--d:700ms">
+                <span class="hero__note-dot"></span>
+                导入 8 步 · 问答 6 步 · 每个节点都向前端推送状态
+            </div>
+
+            <div class="hero__stats reveal" style="--d:760ms">
+                <div><strong>8</strong><span>导入管线步骤</span></div>
+                <div><strong>3</strong><span>路并行召回</span></div>
+                <div><strong>1024</strong><span>BGE-M3 稠密维度</span></div>
+                <div><strong>∞</strong><span>次追问</span></div>
+            </div>
+        </section>
+
+
+        <!-- 技术路线 -->
+        <section class="section section--route" id="pipeline">
+            <div class="section__head reveal">
+                <div>
+                    <p class="eyebrow">技术路线</p>
+                    <h2>每一步都有名字，<br/>所以每条答案都能核对。</h2>
+                </div>
+                <p class="section__desc">
+                    导入侧只跑一次，问答侧每次重跑。<br class="only-wide"/>
+                    LangGraph 编排节点，节点进出即通过 SSE 把进度推到前端。
+                </p>
+            </div>
+
+            <div class="route">
+                <div class="route__lane reveal">
+                    <div class="route__lane-head">
+                        <span class="route__lane-tag">Import</span>
+                        <div>
+                            <strong>导入管线 · 8 步</strong>
+                            <em>一份 PDF → 可检索的双向量切片</em>
+                        </div>
+                        <span class="route__lane-count">01</span>
+                    </div>
+                    <ol class="route__steps">
+                        <li><i aria-hidden="true"></i><span>01</span><strong>归档</strong><p>原始 PDF 先写入 MinIO，保留可追溯副本。</p><em>MinIO</em></li>
+                        <li><i aria-hidden="true"></i><span>02</span><strong>校验</strong><p>按类型与大小分流，确定解析入口。</p><em>Entry Router</em></li>
+                        <li><i aria-hidden="true"></i><span>03</span><strong>版面解析</strong><p>MinerU 云端 VLM 转成保留标题、正文与图片的 Markdown。</p><em>MinerU · VLM</em></li>
+                        <li><i aria-hidden="true"></i><span>04</span><strong>图片归档</strong><p>视觉模型为每张图补一句图注，回写为在线链接。</p><em>VL Model</em></li>
+                        <li><i aria-hidden="true"></i><span>05</span><strong>结构化切分</strong><p>标题粗切 + 300/50 递归细切，切片自带父标题。</p><em>Text Splitter</em></li>
+                        <li><i aria-hidden="true"></i><span>06</span><strong>知识主体</strong><p>LLM 归纳文档级主体，再回填到每一条切片。</p><em>LLM</em></li>
+                        <li><i aria-hidden="true"></i><span>07</span><strong>双向量</strong><p>BGE-M3 同时产出 1024 维稠密向量与稀疏权重。</p><em>BGE-M3</em></li>
+                        <li><i aria-hidden="true"></i><span>08</span><strong>写入索引</strong><p>落库 Milvus，按 file_title 幂等覆盖旧版本。</p><em>Milvus</em></li>
+                    </ol>
+                </div>
+
+                <div class="route__lane reveal">
+                    <div class="route__lane-head">
+                        <span class="route__lane-tag route__lane-tag--ask">Ask</span>
+                        <div>
+                            <strong>问答链路 · 6 步</strong>
+                            <em>一次提问 → 带 [切片:n] 的流式回答</em>
+                        </div>
+                        <span class="route__lane-count">02</span>
+                    </div>
+                    <ol class="route__steps route__steps--six">
+                        <li><i aria-hidden="true"></i><span>01</span><strong>理解问题</strong><p>抽取知识主体并改写查询，带上对话历史上下文。</p><em>LLM</em></li>
+                        <li><i aria-hidden="true"></i><span>02</span><strong>主体对齐</strong><p>主体库混合检索；0.80 命中，0.60–0.80 反问澄清。</p><em>Clarify</em></li>
+                        <li><i aria-hidden="true"></i><span>03</span><strong>多路召回</strong><p>原始查询、HyDE 假设文档、MCP 联网三路并行。</p><em>Hybrid Recall</em></li>
+                        <li><i aria-hidden="true"></i><span>04</span><strong>RRF 融合</strong><p>倒数排名加权合并两路向量结果，取前 10 条候选。</p><em>RRF</em></li>
+                        <li><i aria-hidden="true"></i><span>05</span><strong>重排截断</strong><p>qwen3.7-text-rerank 打分，按断崖差动态决定 TopK。</p><em>Rerank</em></li>
+                        <li><i aria-hidden="true"></i><span>06</span><strong>流式作答</strong><p>9000 字上下文窗口，逐 token 推送并把引用指回原文。</p><em>Stream</em></li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="route__stack reveal">
+                <p>核心栈</p>
+                <span>FastAPI</span>
+                <span>LangGraph</span>
+                <span>Milvus</span>
+                <span>BGE-M3</span>
+                <span>DashScope Rerank</span>
+                <span>MinIO</span>
+                <span>MongoDB</span>
+                <span>MCP Web Search</span>
+            </div>
+        </section>
+
+        <!-- 示例资料库 -->
+        <section class="section" id="worlds">
+            <div class="section__head reveal">
+                <div>
+                    <p class="eyebrow">链路验证 · 示例资料库</p>
+                    <h2>同一套链路，<br/>换不同的资料。</h2>
+                </div>
+                <p class="section__desc">
+                    游戏图鉴、开荒笔记、商品资料，换的只是数据。<br class="only-wide"/>
+                    切分、向量、混合检索、重排与引用，全部走同一条路。
+                </p>
+            </div>
+
+            <div class="feature-world" id="featureWorld" aria-live="polite">
+                <div class="feature-world__skeleton"></div>
+            </div>
+
+            <div class="also-worlds reveal">
+                <div class="also-worlds__head">
+                    <p class="also-worlds__label">更多资料库 · 同一条链路</p>
+                    <span>四份封面不同的资料，走同一条检索链路</span>
+                </div>
+                <div class="worlds worlds--library" id="worldGrid"></div>
+            </div>
+        </section>
+
+        <!-- 资料目录 -->
+        <section class="section" id="archive">
+            <div class="section__head reveal">
+                <div>
+                    <p class="eyebrow">索引粒度 · 图鉴示例</p>
+                    <h2>条目级索引，<br/>点得回原文。</h2>
+                </div>
+                <p class="section__desc">
+                    知识主体先对齐到条目，再召回对应切片。<br class="only-wide"/>
+                    从任一条目出发，看答案如何标注出处。
+                </p>
+            </div>
+            <div class="archive-grid" id="archiveGrid"></div>
+            <div class="index-wall reveal">
+                <div class="index-wall__head">
+                    <span>图鉴索引 <em>高频条目 · 左右滑动或拖拽浏览</em></span>
+                    <span id="indexCount">126</span>
+                </div>
+                <div class="index-wall__rail">
+                    <button class="index-nav" id="indexPrev" type="button" aria-label="向前浏览图鉴索引">
+                        <svg viewBox="0 0 16 16" fill="none"><path d="M10 3.5 5.5 8 10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="index-wall__terms" id="indexWall" tabindex="0" role="list" aria-label="图鉴索引条目"></div>
+                    <button class="index-nav" id="indexNext" type="button" aria-label="向后浏览图鉴索引">
+                        <svg viewBox="0 0 16 16" fill="none"><path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 创建项目 -->
+        <section class="section section--create" id="create">
+            <div class="create">
+                <div class="create__copy reveal">
+                    <p class="eyebrow">导入管线</p>
+                    <h2>上传一份 PDF，<br/>走完上面那 8 步。</h2>
+                    <p class="create__desc">
+                        MinerU 解析版面，视觉模型补齐图注，LLM 归纳知识主体，BGE-M3 生成稠密与稀疏双向量后写入 Milvus。
+                        上传后每一步都会实时回传进度；完成后，这份文档只回答它自己的问题。
+                    </p>
+                    <ul class="feature-list">
+                        <li><span>01</span><div><strong>解析</strong>标题、正文与图片一起保留</div></li>
+                        <li><span>02</span><div><strong>索引</strong>双向量混合检索 + 断崖式重排</div></li>
+                        <li><span>03</span><div><strong>作答</strong>逐 token 流式输出，逐条引用</div></li>
+                    </ul>
+                </div>
+
+                <div class="upload reveal" id="dropZone">
+                    <div class="upload__inner" id="uploadIdle">
+                        <div class="upload__icon">
+                            <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                                <path d="M16 21V7m0 0-5 5m5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M7 20v3.2A2.8 2.8 0 0 0 9.8 26h12.4A2.8 2.8 0 0 0 25 23.2V20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            <span class="upload__pulse"></span>
+                        </div>
+                        <h3>拖入 PDF，或点击选择</h3>
+                        <p>支持 PDF，单个文件不超过 50MB</p>
+                        <button class="btn btn--primary btn--small" type="button" data-action="pick-file">选择文件</button>
+                        <span class="upload__hint">解析通常需要 1–3 分钟，也可以先看看示例资料库</span>
+                    </div>
+
+                    <div class="upload__progress" id="uploadProgress" hidden>
+                        <div class="upload__file">
+                            <span class="pdf-badge">PDF</span>
+                            <div class="upload__file-meta">
+                                <strong id="uploadName">document.pdf</strong>
+                                <span id="uploadSize">0 KB</span>
+                            </div>
+                            <span class="upload__percent" id="uploadPercent">0%</span>
+                        </div>
+                        <div class="bar"><span class="bar__fill" id="uploadBar"></span></div>
+                        <ol class="steps" id="uploadSteps"></ol>
+                        <div class="upload__actions" id="uploadActions"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 我的项目 -->
+        <section class="section" id="library">
+            <div class="section__head reveal">
+                <div>
+                    <p class="eyebrow">我的项目</p>
+                    <h2>你的 PDF，<br/>走同一条链路。</h2>
+                </div>
+                <button class="btn btn--small btn--quiet" data-action="refresh-projects">
+                    刷新列表
+                </button>
+            </div>
+            <div class="library" id="projectList"></div>
+        </section>
+
+        <footer class="footer">
+            <div class="footer__brand">
+                <span class="brand__mark brand__mark--small" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <rect x="3.4" y="4.6" width="17.2" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                        <rect x="6" y="10.4" width="14.6" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1" opacity=".62"/>
+                        <rect x="8.6" y="16.2" width="12" height="3.2" rx="1.1" stroke="currentColor" stroke-width="1.1" opacity=".34"/>
+                        <circle cx="4.6" cy="18.4" r="1.5" fill="currentColor"/>
+                    </svg>
+                </span>
+                zRAG
+            </div>
+            <p>FastAPI + LangGraph 编排 · MinerU 解析 · BGE-M3 双向量 · Milvus 混合检索 · RRF + Rerank · 逐条引用</p>
+            <div class="footer__links">
+                <a href="#pipeline" data-scroll="pipeline">技术路线</a>
+                <a href="#worlds" data-scroll="worlds">示例资料库</a>
+                <a href="/api/health" target="_blank" rel="noopener">服务状态</a>
+            </div>
+        </footer>
+    </section>
+
+    <!-- ================= 对话工作台 ================= -->
+    <section class="view view--workspace" id="viewChat" hidden>
+        <div class="workspace">
+            <aside class="rail">
+                <div class="rail__head">
+                    <a class="rail__brand" href="/" data-action="home" aria-label="返回 zRAG 首页">
+                        <span class="rail__mark" aria-hidden="true">z</span>
+                        <span>
+                            <strong>zRAG</strong>
+                            <em>workspace</em>
+                        </span>
+                    </a>
+                    <a class="rail__home" href="/" data-action="home">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.6 7.4 8 3l5.4 4.4V13a.8.8 0 0 1-.8.8H9.9V9.9H6.1v3.9H3.4a.8.8 0 0 1-.8-.8V7.4Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                        <span>返回首页</span>
+                        <em>技术路线</em>
+                    </a>
+                    <button class="rail__new" id="newConvBtn" aria-haspopup="menu" aria-expanded="false">
+                        <span aria-hidden="true">+</span> 新建对话
+                    </button>
+                    <button class="rail__close" id="railClose" aria-label="收起对话列表">
+                        <svg viewBox="0 0 14 14" fill="none"><path d="m3.5 3.5 7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </button>
+                    <div class="rail__menu" id="newMenu" role="menu" hidden></div>
+                </div>
+
+                <div class="rail__caption">
+                    <span>对话</span>
+                    <span id="convCount">0</span>
+                </div>
+                <div class="rail__scroll" id="convList"></div>
+                <div class="rail__foot">
+                    <span class="rail__status">
+                        <i class="engine__dot" id="engineDot2"></i>
+                        <span id="engineLabel2">连接中</span>
+                    </span>
+                    <a class="rail__foot-home" href="/" data-action="home">返回首页</a>
+                </div>
+            </aside>
+
+            <div class="desk" id="desk" data-layout="single">
+                <header class="desk__bar">
+                    <div class="desk__left">
+                        <a class="desk__home" href="/" data-action="home" aria-label="返回 zRAG 首页">
+                            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.6 7.4 8 3l5.4 4.4V13a.8.8 0 0 1-.8.8H9.9V9.9H6.1v3.9H3.4a.8.8 0 0 1-.8-.8V7.4Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                            <span>返回首页</span>
+                        </a>
+                        <div class="desk__crumbs">
+                            <span>单栏对话</span>
+                            <i aria-hidden="true">/</i>
+                            <strong id="deskTitle">未打开对话</strong>
+                        </div>
+                    </div>
+                    <div class="desk__tools">
+                        <button class="tool tool--mobile" id="railToggle" title="展开对话列表">对话</button>
+                        <button class="tool" id="closeAll" title="关闭当前对话">关闭对话</button>
+                    </div>
+                </header>
+
+                <div class="panes" id="panes"></div>
+
+                <div class="desk__empty" id="deskEmpty">
+                    <div class="desk__empty-inner">
+                        <p class="eyebrow">zRAG workspace</p>
+                        <h2>开一个对话，<br/>把一条链路走完。</h2>
+                        <p>单栏视图只专注一个问题：召回、融合、重排、生成，每一步都在回答里可视化。</p>
+                        <div class="desk__quick" id="quickStarts"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden/>
+<div class="dragover" id="dragOverlay" aria-hidden="true">
+    <div class="dragover__card">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V7m0 0-5 5m5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 20v3.2A2.8 2.8 0 0 0 9.8 26h12.4A2.8 2.8 0 0 0 25 23.2V20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <strong>松手即可上传</strong>
+        <span>PDF · 最大 50MB</span>
+    </div>
+</div>
+
+<!-- 追问澄清 -->
+<div class="modal" id="clarifyModal" hidden>
+    <div class="modal__backdrop" data-close-modal="clarify"></div>
+    <div class="modal__card modal__card--clarify" role="dialog" aria-modal="true" aria-labelledby="clarifyTitle">
+        <button class="modal__close" id="clarifyClose" aria-label="关闭">
+            <svg viewBox="0 0 16 16" fill="none"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+        <p class="eyebrow">追问确认</p>
+        <h2 id="clarifyTitle">再确认一下，你想了解哪一块？</h2>
+        <p class="modal__hint" id="clarifyHint"></p>
+
+        <div class="clarify__block">
+            <p class="clarify__label">相关条目 <span>选一个</span></p>
+            <div class="clarify__chips" id="clarifyEntities"></div>
+        </div>
+        <div class="clarify__block">
+            <p class="clarify__label">想了解 <span>可多选</span></p>
+            <div class="clarify__chips" id="clarifyIntents"></div>
+        </div>
+        <label class="clarify__extra">
+            <span>补充说明（可选）</span>
+            <textarea id="clarifyExtra" rows="2" placeholder="例如：我卡在第二阶段，想先知道站位和输出窗口"></textarea>
+        </label>
+
+        <footer class="modal__foot">
+            <button class="btn btn--quiet btn--small" id="clarifySkip">按原问题直接回答</button>
+            <button class="btn btn--primary btn--small" id="clarifySubmit">确认并提问</button>
+        </footer>
+    </div>
+</div>
+
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

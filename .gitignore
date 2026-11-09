@@ -1,0 +1,21 @@
+.env
+.venv
+
+# Python 字节码缓存（不要提交）
+__pycache__/
+*.py[cod]
+*.pyo
+
+# IDE 本地配置
+.idea/
+
+# 测试用临时文件
+test_file/
+
+# 用户上传的项目文件与注册表
+data/
+
+# 临时脚本与日志
+.tmp_*
+*.log
+.DS_Store
